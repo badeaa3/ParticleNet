@@ -30,7 +30,7 @@ def get_data(config):
 				"features" : features,
 				"mask" : mask
 			}
-			return x
+			return x, weights
 
 		# pick up indices
 		g = [np.zeros((pt.shape[0],pt.shape[1])),np.zeros((pt.shape[0],pt.shape[1]))]
@@ -44,7 +44,7 @@ def get_data(config):
 
 		# print(points.shape, features.shape, mask.shape, y.shape)
 
-		points_train, points_test, features_train, features_test, mask_train, mask_test, y_train, y_test = train_test_split(points,features,mask,y,test_size=0.33, random_state=42)
+		points_train, points_test, features_train, features_test, mask_train, mask_test, y_train, y_test, weights_train, weights_test = train_test_split(points,features,mask,y,weights,test_size=0.33, random_state=42)
 
 		x_train = {
 			"points" : points_train,
@@ -57,7 +57,7 @@ def get_data(config):
 			"mask" : mask_test
 		} 
 
-		return x_train, y_train, x_test, y_test
+		return x_train, y_train, weights_train, x_test, y_test, weights_test
 
 if __name__ == "__main__":
 	x_train, y_train, x_test, y_test = get_data({"inFileName" : "signal_1500_UDB_UDS_training_v65.h5"})

@@ -50,7 +50,7 @@ from get_data import get_data
 #      LOAD DATA           #
 ############################
 
-x_train, y_train, x_test, y_test = get_data({"inFileName" : ops.inFile})
+x_train, y_train, weights_train, x_test, y_test, weights_test = get_data({"inFileName" : ops.inFile})
 
 
 ############################
