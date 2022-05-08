@@ -37,6 +37,9 @@ else:
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("-i", "--inFile", help="Input file", required=True, type=str)
+parser.add_argument("-lr", "--learning_rate", help="Learning rate", default=10e-3, type=float)
+parser.add_argument("-b", "--batch_size", help="Batch size", default=256, type=int)
+parser.add_argument("-e", "--epochs", help="Number of epochs", default=1, type=int)
 ops = parser.parse_args()
 
 # custom code
@@ -65,7 +68,7 @@ else:
 
 # now need to update to unsupervised loss
 model.compile(loss='categorical_crossentropy',
-              optimizer=keras.optimizers.Adam(learning_rate=10e-3),
+              optimizer=keras.optimizers.Adam(learning_rate=ops.learning_rate),
               metrics=['accuracy'])
 model.run_eagerly = True
 # model.summary()
@@ -87,11 +90,9 @@ callbacks = [checkpoint]
 ############################
 #     DO TRAINING          #
 ############################
-batch_size = 256
-epochs = 30
 model.fit(x_train, y_train,
-          batch_size=batch_size,
-          epochs=epochs,
+          batch_size=ops.batch_size,
+          epochs=ops.epochs,
           validation_data=(x_test, y_test),
           shuffle=True,
           callbacks=callbacks,
