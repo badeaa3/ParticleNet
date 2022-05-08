@@ -33,16 +33,21 @@ if len(physical_devices):
 else:
     print("No GPUs Available, using CPU")
 
+# argparse
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument("-i", "--inFile", help="Input file", required=True, type=str)
+ops = parser.parse_args()
+
 # custom code
 from model import get_particle_net, get_particle_net_lite
 from get_data import get_data
-
 
 ############################
 #      LOAD DATA           #
 ############################
 
-x_train, y_train, x_test, y_test = get_data({"inFileName" : "signal_1500_UDB_UDS_training_v65.h5"})
+x_train, y_train, x_test, y_test = get_data({"inFileName" : ops.inFile})
 
 
 ############################
