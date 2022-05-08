@@ -50,8 +50,6 @@ def edge_conv(points, features, num_points, K, channels, with_bn=True, activatio
         knn_fts = tf.concat([knn_fts_center, tf.subtract(knn_fts, knn_fts_center)], axis=-1)  # (N, P, K, 2*C)
 
         x = knn_fts
-        # x = keras.backend.print_tensor(x)
-        print(x.shape)
         for idx, channel in enumerate(channels):
             
             x = keras.layers.Conv2D(channel, kernel_size=(1, 1), strides=1, data_format='channels_last',
@@ -60,7 +58,6 @@ def edge_conv(points, features, num_points, K, channels, with_bn=True, activatio
                 x = keras.layers.BatchNormalization(name='%s_bn%d' % (name, idx))(x)
             if activation:
                 x = keras.layers.Activation(activation, name='%s_act%d' % (name, idx))(x)
-            print(x.shape)
 
         if pooling == 'max':
             fts = tf.reduce_max(x, axis=2)  # (N, P, C')
@@ -92,22 +89,14 @@ def _particle_net_base(points, features=None, mask=None, setting=None, name='par
             mask = tf.cast(tf.not_equal(mask, 0), dtype='float32')  # 1 if valid
             coord_shift = tf.multiply(999., tf.cast(tf.equal(mask, 0), dtype='float32'))  # make non-valid positions to 99
 
-        # features = keras.backend.print_tensor(features, message=f'before batch norm = ')
-
         fts = tf.squeeze(keras.layers.BatchNormalization(name='%s_fts_bn' % name)(tf.expand_dims(features, axis=2)), axis=2)
-
-        # fts = keras.backend.print_tensor(fts, message=f'before edge conv = ')
-
         for layer_idx, layer_param in enumerate(setting.conv_params):
             K, channels = layer_param
             pts = tf.add(coord_shift, points) if layer_idx == 0 else tf.add(coord_shift, fts)
             fts = edge_conv(pts, fts, setting.num_points, K, channels, with_bn=True, activation='relu',
                             pooling=setting.conv_pooling, name='%s_%s%d' % (name, 'EdgeConv', layer_idx))
 
-            # fts = keras.backend.print_tensor(fts, message=f'after edge conv {layer_idx} = ')
-        
         if mask is not None:
-            # mask = keras.backend.print_tensor(mask, message='mask = ')
             fts = tf.multiply(fts, mask)
 
         # if the target is the graph
