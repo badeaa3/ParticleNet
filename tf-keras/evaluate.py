@@ -43,7 +43,7 @@ def main():
     config  = []
     for data in data_list:
         save_path = os.path.join(outDir, os.path.basename(data).replace(".h5","_eval.npz"))
-        config.append({"model_weights" : model_weights,
+        config.append({"model_weights" : ops.model_weights,
                        "inFile"    : data,
                        "save_path" : save_path,
                        "background": ops.background})
@@ -112,7 +112,7 @@ def evaluate(config):
     model.load_weights(ops.model_weights)
 
     # make model prediction
-    p = config["model"].predict(x)
+    p = model.predict(x)
     p_nodes = tf.reshape(p[:,:-1], (-1,8,3))
     p_graph = p[:,-1]
 
