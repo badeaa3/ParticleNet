@@ -19,10 +19,6 @@ except RuntimeError:
 import tensorflow as tf
 os.environ["CUDA_VISIBLE_DEVICES"]="-1" # force CPU usage
 
-# physical_devices = tf.config.list_physical_devices('GPU') 
-# if physical_devices:
-#     tf.config.experimental.set_memory_growth(physical_devices[0], True)
-
 # custom code
 from model import get_particle_net, get_particle_net_lite
 import get_data
@@ -34,12 +30,6 @@ def main():
 
     # check if multiprocessing should be done
     data_list = handleInput()
-
-    # load model
-    num_classes = 1
-    input_shapes = {'points': (8, 2), 'features': (8, 4), 'mask': (8, 1)}
-    model = get_particle_net_lite(num_classes, input_shapes, False)
-    model.load_weights(ops.model_weights)
 
     # make output dir
     if ops.outDir:
@@ -53,7 +43,7 @@ def main():
     config  = []
     for data in data_list:
         save_path = os.path.join(outDir, os.path.basename(data).replace(".h5","_eval.npz"))
-        config.append({"model"     : "", #model,
+        config.append({"model_weights" : model_weights,
                        "inFile"    : data,
                        "save_path" : save_path,
                        "background": ops.background})
@@ -114,6 +104,12 @@ def evaluate(config):
             "features" : features,
             "mask" : mask
         }
+
+    # load model
+    num_classes = 1
+    input_shapes = {k:x[k].shape[1:] for k in x}
+    model = get_particle_net_lite(num_classes, input_shapes, False)
+    model.load_weights(ops.model_weights)
 
     # make model prediction
     p = config["model"].predict(x)
