@@ -40,7 +40,10 @@ def main():
     model.load_weights(ops.model_weights)
 
     # make output dir
-    outDir = os.path.join(ops.outDir, os.path.basename(ops.model_weights.split("/Model")[0]), "Dijets" if ops.background else "Signal")
+    if ops.outDir:
+        outDir = ops.outDir
+    else:
+        outDir = os.path.join(ops.model_weights.split("/Model")[0], "Dijets" if ops.background else "Signal")
     if not os.path.isdir(outDir):
         os.makedirs(outDir, exist_ok=True)
 
@@ -63,7 +66,7 @@ def options():
     parser = argparse.ArgumentParser()
     # input files d
     parser.add_argument("-i",  "--inFile", help="Input file.", default=None)
-    parser.add_argument("-o",  "--outDir", help="Output directory", default="./")
+    parser.add_argument("-o",  "--outDir", help="Output directory", default=None)
     parser.add_argument("-m",  "--model_weights", help="Model weights.", default=None)
     parser.add_argument("-b",  "--background", action="store_true")
     parser.add_argument("-j",  "--ncpu", help="Number of cores to use for multiprocessing. If not provided multiprocessing not done.", default=1, type=int)
