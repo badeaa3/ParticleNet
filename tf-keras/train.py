@@ -44,33 +44,50 @@ ops = parser.parse_args()
 
 # custom code
 from model import get_particle_net, get_particle_net_lite
-from get_data import get_data
+import get_data
 
 ############################
 #      LOAD DATA           #
 ############################
-
-x_train, y_train, weights_train, x_test, y_test, weights_test = get_data({"inFileName" : ops.inFile})
-
+return_graph = False
+if return_graph:
+    x_train, y_train, weights_train, x_test, y_test, weights_test = get_data.get_data(inFileName = ops.inFile)
+    loss = 'categorical_crossentropy'
+else:
+    x_train, y_train, weights_train, x_test, y_test, weights_test = get_data.get_signal_and_background(signal="signal_1500_UDB_UDS_training_v65.h5", background="user.jbossios.364712.e7142_e5984_s3126_r10724_r10726_p4355.27261089._000001.trees_expanded_spanet.h5")
+    loss = {
+        "nodes" : 'categorical_crossentropy', # nodes
+        "graph" : 'binary_crossentropy' # graph
+    }
 
 ############################
 #     MAKE MODEL           #
 ############################
 model_type = 'particle_net_lite'
-num_classes = y_train.shape[1]
+num_classes = 1 #y_train.shape[1]
 input_shapes = {k:x_train[k].shape[1:] for k in x_train}
 print(f"Number of classes {num_classes} and graph shapes {input_shapes}")
+model = get_particle_net_lite(num_classes, input_shapes, return_graph)
 
-if 'lite' in model_type:
-    model = get_particle_net_lite(num_classes, input_shapes)
-else:
-    model = get_particle_net(num_classes, input_shapes)
+def loss_fn(y_true, y_pred):
+
+    # unpack inputs
+    nodes_true = y_true[:,:-1]
+    nodes_true = tf.reshape(nodes_true, (-1,8,3))
+    graph_true = y_true[:,-1]
+    nodes_pred = tf.reshape(y_pred[:,:-1], (-1,8,3))
+    graph_pred = y_pred[:,-1]
+
+    # compute loss
+    graph = tf.keras.losses.BinaryCrossentropy(from_logits=True)(graph_true, graph_pred)
+    nodes = 2*tf.keras.losses.CategoricalCrossentropy()(nodes_true, nodes_pred,sample_weight=graph_true)
+    loss = graph + nodes
+    return loss
 
 # now need to update to unsupervised loss
-model.compile(loss='categorical_crossentropy',
+model.compile(loss=loss_fn,
               optimizer=keras.optimizers.Adam(learning_rate=ops.learning_rate),
               metrics=['accuracy'])
-model.run_eagerly = True
 # model.summary()
 
 # Prepare model model saving directory.

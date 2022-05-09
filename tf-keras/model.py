@@ -70,7 +70,7 @@ def edge_conv(points, features, num_points, K, channels, with_bn=True, activatio
         if with_bn:
             sc = keras.layers.BatchNormalization(name='%s_sc_bn' % name)(sc)
         sc = tf.squeeze(sc, axis=2)
-
+        
         if activation:
             return keras.layers.Activation(activation, name='%s_sc_act' % name)(sc + fts)  # (N, P, C')
         else:
@@ -88,14 +88,13 @@ def _particle_net_base(points, features=None, mask=None, setting=None, name='par
         if mask is not None:
             mask = tf.cast(tf.not_equal(mask, 0), dtype='float32')  # 1 if valid
             coord_shift = tf.multiply(999., tf.cast(tf.equal(mask, 0), dtype='float32'))  # make non-valid positions to 99
-
         fts = tf.squeeze(keras.layers.BatchNormalization(name='%s_fts_bn' % name)(tf.expand_dims(features, axis=2)), axis=2)
         for layer_idx, layer_param in enumerate(setting.conv_params):
             K, channels = layer_param
             pts = tf.add(coord_shift, points) if layer_idx == 0 else tf.add(coord_shift, fts)
-            fts = edge_conv(pts, fts, setting.num_points, K, channels, with_bn=True, activation='relu',
+            fts = edge_conv(pts, fts, setting.num_points, K, channels, with_bn=False, activation='relu', # if layer_idx < len(setting.conv_params)-1 else 'tanh'
                             pooling=setting.conv_pooling, name='%s_%s%d' % (name, 'EdgeConv', layer_idx))
-
+            
         if mask is not None:
             fts = tf.multiply(fts, mask)
 
@@ -111,11 +110,13 @@ def _particle_net_base(points, features=None, mask=None, setting=None, name='par
             x = pool
             for layer_idx, layer_param in enumerate(setting.fc_params):
                 units, drop_rate = layer_param
-                x = keras.layers.Dense(units, activation='relu')(x)
+                x = keras.layers.Dense(units, activation='relu', kernel_regularizer=keras.regularizers.L2(1e-2))(x)
                 if drop_rate is not None and drop_rate > 0:
                     x = keras.layers.Dropout(drop_rate)(x)
-            out = keras.layers.Dense(setting.num_class, activation='sigmoid')(x) #softmax
-            return out  # (N, num_classes)
+            graph = keras.layers.Dense(setting.num_class, activation='sigmoid', name='graph')(x) #softmax
+            nodes = keras.layers.Softmax(axis=-1, name='nodes')(fts)
+            out = tf.concat([keras.layers.Flatten()(nodes),graph],-1)
+            return out # graph, nodes  # (N, num_classes)
         else:
             print(pool.shape)
             return pool
@@ -157,7 +158,7 @@ def get_particle_net(num_classes, input_shapes):
     return keras.Model(inputs=[points, features, mask], outputs=outputs, name='ParticleNet')
 
 
-def get_particle_net_lite(num_classes, input_shapes):
+def get_particle_net_lite(num_classes, input_shapes, return_graph):
     r"""ParticleNet-Lite model from `"ParticleNet: Jet Tagging via Particle Clouds"
     <https://arxiv.org/abs/1902.08570>`_ paper.
     Parameters
@@ -177,16 +178,12 @@ def get_particle_net_lite(num_classes, input_shapes):
         (7, (3, 3, 3)),
         ]
 
-    # setting.conv_params = [
-    #     (7,[32]),
-    #     (7,[3])
-    # ]
     # conv_pooling: 'average' or 'max'
     setting.conv_pooling = 'average'
     # fc_params: list of tuples in the format (C, drop_rate)
     setting.fc_params = [(128, 0.1)]
     setting.num_points = input_shapes['points'][0]
-    setting.return_graph = True # add by AB on Mai 8th
+    setting.return_graph = return_graph # add by AB on Mai 8th
 
     points = keras.Input(name='points', shape=input_shapes['points'])
     features = keras.Input(name='features', shape=input_shapes['features']) if 'features' in input_shapes else None
