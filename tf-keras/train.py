@@ -36,7 +36,8 @@ else:
 # argparse
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument("-i", "--inFile", help="Input file", required=True, type=str)
+parser.add_argument("-is", "--inSigFile", help="Input file", required=True, type=str)
+parser.add_argument("-ib", "--inBkgFile", help="Input file", required=True, type=str)
 parser.add_argument("-lr", "--learning_rate", help="Learning rate", default=10e-3, type=float)
 parser.add_argument("-b", "--batch_size", help="Batch size", default=256, type=int)
 parser.add_argument("-e", "--epochs", help="Number of epochs", default=1, type=int)
@@ -51,10 +52,10 @@ import get_data
 ############################
 return_graph = False
 if return_graph:
-    x_train, y_train, weights_train, x_test, y_test, weights_test = get_data.get_data(inFileName = ops.inFile)
+    x_train, y_train, weights_train, x_test, y_test, weights_test = get_data.get_data(inFileName = ops.inSigFile)
     loss = 'categorical_crossentropy'
 else:
-    x_train, y_train, weights_train, x_test, y_test, weights_test = get_data.get_signal_and_background(signal="signal_1500_UDB_UDS_training_v65.h5", background="user.jbossios.364712.e7142_e5984_s3126_r10724_r10726_p4355.27261089._000001.trees_expanded_spanet.h5")
+    x_train, y_train, weights_train, x_test, y_test, weights_test = get_data.get_signal_and_background(signal=ops.inSigFile, background=ops.inBkgFile)
     loss = {
         "nodes" : 'categorical_crossentropy', # nodes
         "graph" : 'binary_crossentropy' # graph
