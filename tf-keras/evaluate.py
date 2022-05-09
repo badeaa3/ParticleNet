@@ -17,9 +17,11 @@ except RuntimeError:
 
 # Tensorflow GPU settings
 import tensorflow as tf
-physical_devices = tf.config.list_physical_devices('GPU') 
-if physical_devices:
-    tf.config.experimental.set_memory_growth(physical_devices[0], True)
+os.environ["CUDA_VISIBLE_DEVICES"]="-1" # force CPU usage
+
+# physical_devices = tf.config.list_physical_devices('GPU') 
+# if physical_devices:
+#     tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
 # custom code
 from model import get_particle_net, get_particle_net_lite
@@ -51,7 +53,7 @@ def main():
     config  = []
     for data in data_list:
         save_path = os.path.join(outDir, os.path.basename(data).replace(".h5","_eval.npz"))
-        config.append({"model"     : model,
+        config.append({"model"     : "", #model,
                        "inFile"    : data,
                        "save_path" : save_path,
                        "background": ops.background})
