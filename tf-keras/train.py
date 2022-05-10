@@ -35,6 +35,7 @@ parser.add_argument("-lr", "--learning_rate", help="Learning rate", default=10e-
 parser.add_argument("-b", "--batch_size", help="Batch size", default=256, type=int)
 parser.add_argument("-n", "--num_batches", help="Number of batches per epoch", default=1, type=int)
 parser.add_argument("-e", "--epochs", help="Number of epochs", default=1, type=int)
+parser.add_argument("-rn", "--return_nodes", help="The target label includes graph nodes.", action="store_true")
 ops = parser.parse_args()
 
 # custom code
@@ -51,14 +52,14 @@ background = ops.inBkgFile
 fileList = sorted([line.strip() for line in open(ops.inBkgFile,"r")])
 load = False
 probabilities, fileidx, usedFiles = loadWeightSamples(load, "WeightSamplerDijets.npz" if load else fileList)
-train_dataset = WeightedSamplingDataLoader(njets, signal, probabilities, fileidx, fileList if load else usedFiles, ops.num_batches, ops.batch_size).map(formInput).prefetch(tf.data.AUTOTUNE)
-validation_dataset = WeightedSamplingDataLoader(njets, signal, probabilities, fileidx, fileList if load else usedFiles, ops.num_batches, ops.batch_size).map(formInput).prefetch(tf.data.AUTOTUNE)
+train_dataset = WeightedSamplingDataLoader(njets, signal, probabilities, fileidx, fileList if load else usedFiles, ops.num_batches, ops.batch_size, ops.return_nodes).map(formInput).prefetch(tf.data.AUTOTUNE)
+validation_dataset = WeightedSamplingDataLoader(njets, signal, probabilities, fileidx, fileList if load else usedFiles, ops.num_batches, ops.batch_size, ops.return_nodes).map(formInput).prefetch(tf.data.AUTOTUNE)
 
 ############################
 #     MAKE MODEL           #
 ############################
 model_type = 'particle_net_lite'
-model = get_particle_net_lite(num_classes = 1, input_shapes = {'points': (8, 2), 'features': (8, 4), 'mask': (8, 1)}, return_graph = False)
+model = get_particle_net_lite(num_classes = 1, input_shapes = {'points': (8, 2), 'features': (8, 4), 'mask': (8, 1)}, return_nodes = ops.return_nodes)
 
 def loss_fn(y_true, y_pred):
 
@@ -76,9 +77,9 @@ def loss_fn(y_true, y_pred):
     return loss
 
 # now need to update to unsupervised loss
-model.compile(loss=loss_fn,
-              optimizer=keras.optimizers.Adam(learning_rate=ops.learning_rate)) #,
-              # metrics=['accuracy'])
+model.compile(loss=loss_fn if ops.return_nodes else 'binary_crossentropy',
+              optimizer=keras.optimizers.Adam(learning_rate=ops.learning_rate),
+              metrics=['accuracy'])
 # model.summary()
 
 # Prepare model saving directory.

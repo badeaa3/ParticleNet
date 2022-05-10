@@ -2,7 +2,7 @@ import numpy as np
 import h5py
 import tensorflow as tf
 
-def getXY(inFileName, eventList, signal):
+def getXY(inFileName, eventList, signal, return_nodes):
     with h5py.File(inFileName, "r") as hf:
 
         # if event list is int then choose random
@@ -43,7 +43,10 @@ def getXY(inFileName, eventList, signal):
             nodes = np.zeros((points.shape[0], points.shape[1] * 3))
             graph = np.zeros((points.shape[0], 1))
 
-        y = np.concatenate([nodes,graph],-1)
+        if return_nodes:
+            y = np.concatenate([nodes,graph],-1)
+        else:
+            y = graph
 
     return points, features, mask, y
 
@@ -84,14 +87,14 @@ def formInput(points, features, mask, y):
 
 class WeightedSamplingDataLoader(tf.data.Dataset):
 
-    def _generator(signal, probabilities, fileidx, fileList, num_batches, batch_size):
+    def _generator(signal, probabilities, fileidx, fileList, num_batches, batch_size, return_nodes):
         for iB in range(num_batches):
 
             # create batch
             half_batch_size = int(batch_size/2)
 
             # sample from signal
-            points, features, mask, y = getXY(signal, half_batch_size, True)
+            points, features, mask, y = getXY(signal, half_batch_size, True, return_nodes)
 
             # sample from background
             idx = np.random.choice(range(0,len(probabilities)), size=half_batch_size, p = probabilities, replace = True)
@@ -102,7 +105,7 @@ class WeightedSamplingDataLoader(tf.data.Dataset):
             events = [samples[np.where(samples[:,0] == i)][:,1] for i in files]
             for iF,iE in zip(files,events):
 
-                b_points, b_features, b_mask, b_y = getXY(fileList[iF], iE, False)
+                b_points, b_features, b_mask, b_y = getXY(fileList[iF], iE, False, return_nodes)
                 points = np.concatenate([points, b_points])
                 features = np.concatenate([features, b_features])
                 mask = np.concatenate([mask, b_mask])
@@ -116,16 +119,16 @@ class WeightedSamplingDataLoader(tf.data.Dataset):
 
             yield points, features, mask, y
 
-    def __new__(self, njets, signal, probabilities, fileidx, fileList, num_batches, batch_size):
+    def __new__(self, njets, signal, probabilities, fileidx, fileList, num_batches, batch_size, return_nodes):
         return tf.data.Dataset.from_generator(
             self._generator,
             output_signature = (
                 tf.TensorSpec(shape = (None, njets, 2), dtype = tf.float64),
                 tf.TensorSpec(shape = (None, njets, 4), dtype = tf.float64),
                 tf.TensorSpec(shape = (None, njets, 1), dtype = tf.float64),
-                tf.TensorSpec(shape = (None, njets*3 + 1), dtype = tf.float64),
+                tf.TensorSpec(shape = (None, njets*3 + 1 if return_nodes else 1), dtype = tf.float64),
             ),
-            args=(signal, probabilities, fileidx, fileList, num_batches, batch_size,)
+            args=(signal, probabilities, fileidx, fileList, num_batches, batch_size, return_nodes)
         )
 
 if __name__ == "__main__":
@@ -143,8 +146,9 @@ if __name__ == "__main__":
     probabilities, fileidx, usedFiles = loadWeightSamples(load, "WeightSamplerDijets.npz" if load else fileList)
     num_batches = 5
     batch_size = 4
+    return_nodes = False
 
-    dataset = WeightedSamplingDataLoader(njets, signal, probabilities, fileidx, fileList if load else usedFiles, num_batches, batch_size).map(formInput).prefetch(tf.data.AUTOTUNE)
+    dataset = WeightedSamplingDataLoader(njets, signal, probabilities, fileidx, fileList if load else usedFiles, num_batches, batch_size, return_nodes).map(formInput).prefetch(tf.data.AUTOTUNE)
 
     num_epochs = 1
     for epoch_num in range(num_epochs):

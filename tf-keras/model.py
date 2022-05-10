@@ -98,12 +98,6 @@ def _particle_net_base(points, features=None, mask=None, setting=None, name='par
         if mask is not None:
             fts = tf.multiply(fts, mask)
 
-        # if the target is the graph
-        if setting.return_graph:
-            fts = tf.nn.softmax(fts,-1)
-            # fts = keras.backend.print_tensor(fts, message='final = ')
-            return fts
-
         # If you want to pool to class labels per event
         pool = tf.reduce_mean(fts, axis=1)  # (N, C)
         if setting.fc_params is not None:
@@ -113,9 +107,10 @@ def _particle_net_base(points, features=None, mask=None, setting=None, name='par
                 x = keras.layers.Dense(units, activation='relu', kernel_regularizer=keras.regularizers.L2(1e-2))(x)
                 if drop_rate is not None and drop_rate > 0:
                     x = keras.layers.Dropout(drop_rate)(x)
-            graph = keras.layers.Dense(setting.num_class, activation='sigmoid', name='graph')(x) #softmax
-            nodes = keras.layers.Softmax(axis=-1, name='nodes')(fts)
-            out = tf.concat([keras.layers.Flatten()(nodes),graph],-1)
+            out = keras.layers.Dense(setting.num_class, activation='sigmoid', name='graph')(x) #softmax
+            if setting.return_nodes:
+                nodes = keras.layers.Softmax(axis=-1, name='nodes')(fts)
+                out = tf.concat([keras.layers.Flatten()(nodes),graph],-1)
             return out # graph, nodes  # (N, num_classes)
         else:
             print(pool.shape)
@@ -158,7 +153,7 @@ def get_particle_net(num_classes, input_shapes):
     return keras.Model(inputs=[points, features, mask], outputs=outputs, name='ParticleNet')
 
 
-def get_particle_net_lite(num_classes, input_shapes, return_graph):
+def get_particle_net_lite(num_classes, input_shapes, return_nodes):
     r"""ParticleNet-Lite model from `"ParticleNet: Jet Tagging via Particle Clouds"
     <https://arxiv.org/abs/1902.08570>`_ paper.
     Parameters
@@ -183,7 +178,7 @@ def get_particle_net_lite(num_classes, input_shapes, return_graph):
     # fc_params: list of tuples in the format (C, drop_rate)
     setting.fc_params = [(128, 0.1)]
     setting.num_points = input_shapes['points'][0]
-    setting.return_graph = return_graph # add by AB on Mai 8th
+    setting.return_nodes = return_nodes # add by AB on Mai 8th
 
     points = keras.Input(name='points', shape=input_shapes['points'])
     features = keras.Input(name='features', shape=input_shapes['features']) if 'features' in input_shapes else None
