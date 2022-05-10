@@ -33,6 +33,7 @@ parser.add_argument("-is", "--inSigFile", help="Input file", type=str)
 parser.add_argument("-ib", "--inBkgFile", help="Input file", type=str)
 parser.add_argument("-lr", "--learning_rate", help="Learning rate", default=10e-3, type=float)
 parser.add_argument("-b", "--batch_size", help="Batch size", default=256, type=int)
+parser.add_argument("-n", "--num_batches", help="Number of batches per epoch", default=1, type=int)
 parser.add_argument("-e", "--epochs", help="Number of epochs", default=1, type=int)
 ops = parser.parse_args()
 
@@ -50,9 +51,8 @@ background = ops.inBkgFile
 fileList = sorted([line.strip() for line in open(ops.inBkgFile,"r")])
 load = False
 probabilities, fileidx, usedFiles = loadWeightSamples(load, "WeightSamplerDijets.npz" if load else fileList)
-num_batches = 100
-train_dataset = WeightedSamplingDataLoader(njets, signal, probabilities, fileidx, fileList if load else usedFiles, num_batches, ops.batch_size).map(formInput).prefetch(tf.data.AUTOTUNE)
-validation_dataset = WeightedSamplingDataLoader(njets, signal, probabilities, fileidx, fileList if load else usedFiles, num_batches, ops.batch_size).map(formInput).prefetch(tf.data.AUTOTUNE)
+train_dataset = WeightedSamplingDataLoader(njets, signal, probabilities, fileidx, fileList if load else usedFiles, ops.num_batches, ops.batch_size).map(formInput).prefetch(tf.data.AUTOTUNE)
+validation_dataset = WeightedSamplingDataLoader(njets, signal, probabilities, fileidx, fileList if load else usedFiles, ops.num_batches, ops.batch_size).map(formInput).prefetch(tf.data.AUTOTUNE)
 
 ############################
 #     MAKE MODEL           #
