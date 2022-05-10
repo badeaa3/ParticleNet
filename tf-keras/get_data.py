@@ -69,7 +69,6 @@ def get_signal_and_background(signal,background):
 
 		# load
 		s_x_train, s_y_train, s_weights_train, s_x_test, s_y_test, s_weights_test = get_data(signal)
-		b_x, b_weights = get_data(background, True)
 
 		# combine signal inputs
 		points = np.concatenate([s_x_train["points"], s_x_test["points"]])
@@ -79,15 +78,19 @@ def get_signal_and_background(signal,background):
 		nodes = np.concatenate([s_y_train, s_y_test])
 		graph = np.ones((nodes.shape[0],1))
 		weights = np.concatenate([s_weights_train, s_weights_test])
+
 		# combine with background
-		points = np.concatenate([points, b_x["points"]])
-		features = np.concatenate([features, b_x["features"]])
-		mask = np.concatenate([mask, b_x["mask"]])
-		b_nodes = np.zeros((b_x["points"].shape[0], b_x["points"].shape[1], 3))
-		# b_nodes[:,:,2] = 1
-		nodes = np.concatenate([nodes, b_nodes])
-		graph = np.concatenate([graph, np.zeros((b_x["points"].shape[0], 1))])
-		weights = np.concatenate([weights, b_weights])
+		if background:
+			print("Background file provided")
+			b_x, b_weights = get_data(background, True)
+			points = np.concatenate([points, b_x["points"]])
+			features = np.concatenate([features, b_x["features"]])
+			mask = np.concatenate([mask, b_x["mask"]])
+			b_nodes = np.zeros((b_x["points"].shape[0], b_x["points"].shape[1], 3))
+			# b_nodes[:,:,2] = 1
+			nodes = np.concatenate([nodes, b_nodes])
+			graph = np.concatenate([graph, np.zeros((b_x["points"].shape[0], 1))])
+			weights = np.concatenate([weights, b_weights])
 
 		# split
 		points_train, points_test, features_train, features_test, mask_train, mask_test, nodes_train, nodes_test, graph_train, graph_test, weights_train, weights_test = train_test_split(points,features,mask,nodes,graph,weights,test_size=0.33, random_state=42)

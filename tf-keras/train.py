@@ -81,8 +81,8 @@ def loss_fn(y_true, y_pred):
 
     # compute loss
     graph = tf.keras.losses.BinaryCrossentropy(from_logits=True)(graph_true, graph_pred)
-    nodes = 2*tf.keras.losses.CategoricalCrossentropy()(nodes_true, nodes_pred,sample_weight=graph_true)
-    loss = graph + nodes
+    nodes = tf.keras.losses.CategoricalCrossentropy()(nodes_true, nodes_pred,sample_weight=graph_true)
+    loss = 0*graph + nodes
     return loss
 
 # now need to update to unsupervised loss
@@ -102,7 +102,9 @@ checkpoint = keras.callbacks.ModelCheckpoint(filepath=filepath,
                              monitor='val_accuracy',
                              verbose=1,
                              save_best_only=True)
-callbacks = [checkpoint]
+early_stopping = tf.keras.callbacks.EarlyStopping(patience=10, mode="min", restore_best_weights=True, monitor="val_loss")
+term_on_nan = tf.keras.callbacks.TerminateOnNaN()
+callbacks = [checkpoint, early_stopping, term_on_nan]
 
 
 ############################
