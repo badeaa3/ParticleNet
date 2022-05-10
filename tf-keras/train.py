@@ -48,11 +48,11 @@ njets = 8
 signal = ops.inSigFile
 background = ops.inBkgFile
 fileList = sorted([line.strip() for line in open(ops.inBkgFile,"r")])
-load = True
-probabilities, fileidx = loadWeightSamples(load, "WeightSamplerDijets.npz" if load else fileList)
+load = False
+probabilities, fileidx, usedFiles = loadWeightSamples(load, "WeightSamplerDijets.npz" if load else fileList)
 num_batches = 100
-train_dataset = WeightedSamplingDataLoader(njets, signal, probabilities, fileidx, fileList, num_batches, ops.batch_size).map(formInput).prefetch(tf.data.AUTOTUNE)
-validation_dataset = WeightedSamplingDataLoader(njets, signal, probabilities, fileidx, fileList, num_batches, ops.batch_size).map(formInput).prefetch(tf.data.AUTOTUNE)
+train_dataset = WeightedSamplingDataLoader(njets, signal, probabilities, fileidx, fileList if load else usedFiles, num_batches, ops.batch_size).map(formInput).prefetch(tf.data.AUTOTUNE)
+validation_dataset = WeightedSamplingDataLoader(njets, signal, probabilities, fileidx, fileList if load else usedFiles, num_batches, ops.batch_size).map(formInput).prefetch(tf.data.AUTOTUNE)
 
 ############################
 #     MAKE MODEL           #

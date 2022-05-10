@@ -52,22 +52,26 @@ def loadWeightSamples(loadWeightSampler, fileList):
         with np.load("WeightSamplerDijets.npz",allow_pickle=True) as x:
             weights = x["weights"]
             fileidx = x["fileidx"]
+        usedFiles = fileList
     else:
         weights = []
         fileidx = []
+        usedFiles = []
         for iF, file in enumerate(fileList):
-                print(f"File {iF}/{len(fileList)}")
-                with h5py.File(file, "r") as hf:
-                        normweight = np.array(hf["normweight"]["normweight"]).flatten()
-                        nevents = normweight.shape[0]
-                        weights.append(normweight)
-                        fileidx.append(np.stack([np.full((nevents),iF),np.arange(nevents)],-1))
+            print(f"File {iF}/{len(fileList)}")
+            with h5py.File(file, "r") as hf:
+                normweight = np.array(hf["normweight"]["normweight"]).flatten()
+                nevents = normweight.shape[0]
+                if nevents > 0:
+                    weights.append(normweight)
+                    fileidx.append(np.stack([np.full((nevents),iF),np.arange(nevents)],-1))
+                    usedFiles.append(file)
         weights = np.concatenate(weights)
         fileidx = np.concatenate(fileidx)
         np.savez("WeightSamplerDijets.npz",**{"weights":weights,"fileidx":fileidx})
     probabilities = weights / weights.sum()
 
-    return probabilities, fileidx
+    return probabilities, fileidx, usedFiles
 
 def formInput(points, features, mask, y):
     x = {
@@ -135,11 +139,11 @@ if __name__ == "__main__":
     njets = 8
     signal = "signal_1500_UDB_UDS_training_v65.h5"
     load = True
-    probabilities, fileidx = loadWeightSamples(load, "WeightSamplerDijets.npz" if load else fileList)
+    probabilities, fileidx, usedFiles = loadWeightSamples(load, "WeightSamplerDijets.npz" if load else fileList)
     num_batches = 5
     batch_size = 4
 
-    dataset = WeightedSamplingDataLoader(njets, signal, probabilities, fileidx, fileList, num_batches, batch_size).map(formInput).prefetch(tf.data.AUTOTUNE)
+    dataset = WeightedSamplingDataLoader(njets, signal, probabilities, fileidx, fileList if load else usedFiles, num_batches, batch_size).map(formInput).prefetch(tf.data.AUTOTUNE)
 
     num_epochs = 1
     for epoch_num in range(num_epochs):
