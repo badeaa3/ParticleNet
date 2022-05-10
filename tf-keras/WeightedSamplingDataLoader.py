@@ -37,12 +37,13 @@ def getXY(inFileName, eventList, signal):
             g = np.stack(g,-1)
             isr = np.expand_dims(np.invert(g.sum(-1).astype(bool)).astype(int),-1)
             nodes = np.concatenate([g,isr],-1)
+            nodes = nodes.reshape(nodes.shape[0],-1)
             graph = np.ones((nodes.shape[0],1))
         else:
-            nodes = np.zeros((points.shape[0], points.shape[1], 3))
+            nodes = np.zeros((points.shape[0], points.shape[1] * 3))
             graph = np.zeros((points.shape[0], 1))
 
-        y = np.concatenate([nodes.reshape(nodes.shape[0],-1),graph],-1)
+        y = np.concatenate([nodes,graph],-1)
 
     return points, features, mask, y
 
