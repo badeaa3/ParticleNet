@@ -13,13 +13,6 @@ mask: a mask array with a shape of (N, 1, P), taking a value of 0 for padded pos
 
 # general python
 import os
-import math
-import numpy as np
-
-# logging
-import logging
-logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s')
-log = logging.getLogger()
 
 # Tensorflow GPU settings
 import tensorflow as tf
@@ -36,8 +29,8 @@ else:
 # argparse
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument("-is", "--inSigFile", help="Input file", required=True, type=str)
-parser.add_argument("-ib", "--inBkgFile", help="Input file", required=True, type=str)
+parser.add_argument("-is", "--inSigFile", help="Input file", type=str)
+parser.add_argument("-ib", "--inBkgFile", help="Input file", type=str)
 parser.add_argument("-lr", "--learning_rate", help="Learning rate", default=10e-3, type=float)
 parser.add_argument("-b", "--batch_size", help="Batch size", default=256, type=int)
 parser.add_argument("-e", "--epochs", help="Number of epochs", default=1, type=int)
@@ -45,30 +38,27 @@ ops = parser.parse_args()
 
 # custom code
 from model import get_particle_net, get_particle_net_lite
-import get_data
+from WeightedSamplingDataLoader import WeightedSamplingDataLoader, loadWeightSamples, formInput
 
 ############################
 #      LOAD DATA           #
 ############################
-return_graph = False
-if return_graph:
-    x_train, y_train, weights_train, x_test, y_test, weights_test = get_data.get_data(inFileName = ops.inSigFile)
-    loss = 'categorical_crossentropy'
-else:
-    x_train, y_train, weights_train, x_test, y_test, weights_test = get_data.get_signal_and_background(signal=ops.inSigFile, background=ops.inBkgFile)
-    loss = {
-        "nodes" : 'categorical_crossentropy', # nodes
-        "graph" : 'binary_crossentropy' # graph
-    }
+
+njets = 8
+signal = ops.inSigFile
+background = ops.inBkgFile
+fileList = sorted([line.strip() for line in open(ops.inBkgFile,"r")])
+load = True
+probabilities, fileidx = loadWeightSamples(load, "WeightSamplerDijets.npz" if load else fileList)
+num_batches = 100
+train_dataset = WeightedSamplingDataLoader(njets, signal, probabilities, fileidx, fileList, num_batches, ops.batch_size).map(formInput).prefetch(tf.data.AUTOTUNE)
+validation_dataset = WeightedSamplingDataLoader(njets, signal, probabilities, fileidx, fileList, num_batches, ops.batch_size).map(formInput).prefetch(tf.data.AUTOTUNE)
 
 ############################
 #     MAKE MODEL           #
 ############################
 model_type = 'particle_net_lite'
-num_classes = 1 #y_train.shape[1]
-input_shapes = {k:x_train[k].shape[1:] for k in x_train}
-print(f"Number of classes {num_classes} and graph shapes {input_shapes}")
-model = get_particle_net_lite(num_classes, input_shapes, return_graph)
+model = get_particle_net_lite(num_classes = 1, input_shapes = {'points': (8, 2), 'features': (8, 4), 'mask': (8, 1)}, return_graph = False)
 
 def loss_fn(y_true, y_pred):
 
@@ -87,33 +77,32 @@ def loss_fn(y_true, y_pred):
 
 # now need to update to unsupervised loss
 model.compile(loss=loss_fn,
-              optimizer=keras.optimizers.Adam(learning_rate=ops.learning_rate),
-              metrics=['accuracy'])
+              optimizer=keras.optimizers.Adam(learning_rate=ops.learning_rate)) #,
+              # metrics=['accuracy'])
 # model.summary()
 
-# Prepare model model saving directory.
+# Prepare model saving directory.
 save_dir = 'model_checkpoints'
 model_name = '%s_model.{epoch:03d}.h5' % model_type
 if not os.path.isdir(save_dir):
     os.makedirs(save_dir)
 filepath = os.path.join(save_dir, model_name)
+
 # Prepare callbacks for model saving and for learning rate adjustment.
-checkpoint = keras.callbacks.ModelCheckpoint(filepath=filepath,
-                             monitor='val_accuracy',
-                             verbose=1,
-                             save_best_only=True)
-early_stopping = tf.keras.callbacks.EarlyStopping(patience=10, mode="min", restore_best_weights=True, monitor="val_loss")
-term_on_nan = tf.keras.callbacks.TerminateOnNaN()
-callbacks = [checkpoint, early_stopping, term_on_nan]
+callbacks = [
+    keras.callbacks.ModelCheckpoint(filepath=filepath,monitor='val_loss',verbose=1,save_best_only=True),
+    tf.keras.callbacks.EarlyStopping(patience=10, mode="min", restore_best_weights=True, monitor="val_loss"), 
+    tf.keras.callbacks.TerminateOnNaN()
+]
 
 
 ############################
 #     DO TRAINING          #
 ############################
-model.fit(x_train, y_train,
+model.fit(train_dataset,
           batch_size=ops.batch_size,
           epochs=ops.epochs,
-          validation_data=(x_test, y_test),
+          validation_data=validation_dataset,
           shuffle=True,
           callbacks=callbacks,
           verbose=1)
