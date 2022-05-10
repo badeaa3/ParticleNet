@@ -101,7 +101,7 @@ class WeightedSamplingDataLoader(tf.data.Dataset):
             events = [samples[np.where(samples[:,0] == i)][:,1] for i in files]
             for iF,iE in zip(files,events):
 
-                b_points, b_features, b_mask, b_y = getXY(fileList[iF], list(range(half_batch_size)), False)
+                b_points, b_features, b_mask, b_y = getXY(fileList[iF], iE, False)
                 points = np.concatenate([points, b_points])
                 features = np.concatenate([features, b_features])
                 mask = np.concatenate([mask, b_mask])
