@@ -65,7 +65,9 @@ def main():
     y = np.concatenate([y,isr],-1)
     # remove extra row used for handling gluino index of -1
     y =  y[:,:p.shape[1]] 
-        
+    del g1, g2, isr
+    gc.collect()
+
     # split samples
     p_train, p_test, f_train, f_test, mask_train, mask_test, y_train, y_test = train_test_split(p, f, mask, y, test_size=0.75, shuffle=True)
     x_train = {"points": p_train, "features": f_train, "mask": mask_train}
@@ -79,7 +81,7 @@ def main():
     print(f"Num classes {num_classes}, Input shapes {input_shapes}, Train target shape {y_train.shape}, Test target shape {y_test.shape}")
     model = get_particle_net_evt(num_classes, input_shapes)
     model.compile(optimizer=tf.optimizers.Adam(learning_rate=ops.learning_rate), loss='categorical_crossentropy', metrics=['accuracy'])
-    # model.summary()
+    model.summary()
 
     # make callbacks
     callbacks = []
