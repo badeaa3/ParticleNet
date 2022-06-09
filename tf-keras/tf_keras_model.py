@@ -93,15 +93,48 @@ def _particle_net_base(points, features=None, mask=None, setting=None, name='par
         fts = tf.squeeze(keras.layers.BatchNormalization(name='%s_fts_bn' % name)(tf.expand_dims(features, axis=2)), axis=2)
         for layer_idx, layer_param in enumerate(setting.conv_params):
             K, channels = layer_param
+            print(K,channels)
             pts = tf.add(coord_shift, points) if layer_idx == 0 else tf.add(coord_shift, fts)
             fts = edge_conv(pts, fts, setting.num_points, K, channels, with_bn=True, activation='relu',
                             pooling=setting.conv_pooling, name='%s_%s%d' % (name, 'EdgeConv', layer_idx))
-
+        
         if mask is not None:
             fts = tf.multiply(fts, mask)
 
-        pool = tf.reduce_mean(fts, axis=1)  # (N, C)
+        # added by anthony
+        # if setting.fc_params == "fts":
+        #     # convert per jet attribute to sum to 1
+        #     fts = tf.nn.softmax(fts,axis=-1)
+            
+        #     # extract jet four-momenta
+        #     pt = features[:,:,0]
+        #     eta = points[:,:,0]
+        #     phi = points[:,:,1]
+        #     e = features[:,:,1]
+        #     px = pt * tf.cos(phi)
+        #     py = pt * tf.sin(phi)
+        #     pz = pt * tf.sinh(eta)
+        #     mom = tf.stack([e,px,py,pz],-1)
+        #     mom = tf.multiply(mom,mask)
+        #     # compute parents four mom
+        #     parents = tf.einsum("bjk, bkn -> bjn", tf.transpose(fts,[0,2,1]), mom)
+        #     # compute parent masses
+        #     masses = tf.sqrt(parents[:,:,0]**2 - parents[:,:,1]**2 - parents[:,:,2]**2 - parents[:,:,3]**2)
+        #     # fts = keras.backend.print_tensor(fts[0])
+        #     print(masses.shape)
+        #     print(fts.shape) 
+        #     out = tf.transpose(tf.concat([tf.expand_dims(masses,1),fts],1),[0,2,1])
+        #     print(out.shape)
+        #     return out
 
+        # if the target is the graph
+        if setting.return_graph:
+            fts = tf.nn.softmax(fts,-1)
+            tf.print(fts.shape)
+            return fts
+
+        # If you want to pool to class labels per event
+        pool = tf.reduce_mean(fts, axis=1)  # (N, C)
         if setting.fc_params is not None:
             x = pool
             for layer_idx, layer_param in enumerate(setting.fc_params):
@@ -109,9 +142,10 @@ def _particle_net_base(points, features=None, mask=None, setting=None, name='par
                 x = keras.layers.Dense(units, activation='relu')(x)
                 if drop_rate is not None and drop_rate > 0:
                     x = keras.layers.Dropout(drop_rate)(x)
-            out = keras.layers.Dense(setting.num_class, activation='softmax')(x)
+            out = keras.layers.Dense(setting.num_class, activation='sigmoid')(x) #softmax
             return out  # (N, num_classes)
         else:
+            print(pool.shape)
             return pool
 
 
@@ -167,12 +201,48 @@ def get_particle_net_lite(num_classes, input_shapes):
     setting.conv_params = [
         (7, (32, 32, 32)),
         (7, (64, 64, 64)),
+        (7, (32, 32, 32)),
+        (7, (3, 3, 3)),
         ]
     # conv_pooling: 'average' or 'max'
     setting.conv_pooling = 'average'
     # fc_params: list of tuples in the format (C, drop_rate)
     setting.fc_params = [(128, 0.1)]
     setting.num_points = input_shapes['points'][0]
+    setting.return_graph = True # add by AB on Mai 8th
+
+    points = keras.Input(name='points', shape=input_shapes['points'])
+    features = keras.Input(name='features', shape=input_shapes['features']) if 'features' in input_shapes else None
+    mask = keras.Input(name='mask', shape=input_shapes['mask']) if 'mask' in input_shapes else None
+    outputs = _particle_net_base(points, features, mask, setting, name='ParticleNet')
+    print(outputs.shape)
+    return keras.Model(inputs=[points, features, mask], outputs=outputs, name='ParticleNet')
+
+def get_particle_net_evt(num_classes, input_shapes):
+    r"""ParticleNet-Lite model from `"ParticleNet: Jet Tagging via Particle Clouds"
+    <https://arxiv.org/abs/1902.08570>`_ paper.
+    Parameters
+    ----------
+    num_classes : int
+        Number of output classes.
+    input_shapes : dict
+        The shapes of each input (`points`, `features`, `mask`).
+    """
+    setting = _DotDict()
+    setting.num_class = num_classes
+    # conv_params: list of tuple in the format (K, (C1, C2, C3))
+    setting.conv_params = [
+        (7, (32, 32, 32)),
+        (7, (64, 64, 64)),
+        (7, (32, 32, 32)),
+        (7, (3, 3, 3)),
+        ]
+    # conv_pooling: 'average' or 'max'
+    setting.conv_pooling = 'average'
+    # fc_params: list of tuples in the format (C, drop_rate)
+    setting.fc_params = [(128, 0.1)] #"fts" #None #
+    setting.num_points = input_shapes['points'][0]
+    setting.return_graph = True
 
     points = keras.Input(name='points', shape=input_shapes['points'])
     features = keras.Input(name='features', shape=input_shapes['features']) if 'features' in input_shapes else None
