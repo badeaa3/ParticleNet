@@ -16,6 +16,7 @@ import gc
 import datetime
 import argparse
 import tensorflow as tf
+import matplotlib.pyplot as plt
 
 # custom code
 from tf_keras_model import get_particle_net_evt
@@ -40,7 +41,7 @@ def main():
             tf.keras.utils.set_random_seed(ops.seed)
 
     # load data
-    with h5py.File("user.abadea.504518.e8258_e7400_s3126_r10724_r10726_p5083.29059700._000001.trees_minJetPt50_minNjets6_maxNjets8_RDR_dr_v0.h5","r") as file:
+    with h5py.File(ops.inFile,"r") as file:
         # points (NOTE: difference from the original readme the channel needs to go last so the order is (N,P,C))
         p = np.stack([file['source']['eta'],file['source']['phi']],-1)
         # features
@@ -102,6 +103,13 @@ def main():
         verbose=1,
         validation_data=(x_test,y_test)
     )
+
+    # plot loss
+    plt.figure('loss_vs_epoch'); plt.xlabel('Epoch'); plt.ylabel('Loss')
+    plt.plot(history.history['loss'], label='loss')
+    plt.plot(history.history['val_loss'], label='val_loss')
+    plt.yscale('log'); plt.legend(); plt.grid(True)
+    plt.savefig(os.path.join(ops.outDir,'loss_vs_epochs.pdf'))
 
 def options():
     parser = argparse.ArgumentParser()

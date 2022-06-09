@@ -130,7 +130,6 @@ def _particle_net_base(points, features=None, mask=None, setting=None, name='par
         # if the target is the graph
         if setting.return_graph:
             fts = tf.nn.softmax(fts,-1)
-            tf.print(fts.shape)
             return fts
 
         # If you want to pool to class labels per event
